@@ -7,7 +7,7 @@
 
 #define variables
 $url_prefix = "https://api-na.hosted.exlibrisgroup.com"
-$queryParams = [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('l7xx949a811569604471b5b08164c55ba6d2');
+$queryParams = [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('**API key here**');
 $file = "C:\Work\Alma\citations.xlsx"
 $sheetName = "Sheet1"
 
