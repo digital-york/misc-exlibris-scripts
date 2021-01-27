@@ -1,4 +1,5 @@
-# PEH Sept 2018
+# Updated PEH 2021 - perform check for active holds 
+#PEH Sept 2018
 # PS script to read through file of barcodes ...
 # ... retrieve item link for each and perform scan-in
 # uses BIBS API (Bulk Returns)
@@ -9,8 +10,9 @@
 #define variables
 $url_prefix = "https://api-na.hosted.exlibrisgroup.com/"
 $queryParams = '&' +  [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('**API key here**');
+
 #$api_key = [System.Web.HttpUtility]::UrlEncode($key) 
-$file = "C:\Work\Alma\returns.xlsx"
+$file = "C:\Work\Bulk returns\returns.xlsx"
 $sheetName = "results"
 $library = "EXTST"
 $circ_desk = "DEFAULT_CIRC_DESK"
@@ -42,13 +44,15 @@ $rowbarc,$colbarc = 1,1
 		}
 		
 		Write-Host "Processing barcode" $barcode " row number" ($rowbarc+$i) 
-	
+		#retrieve item info
 		$item_by_barc_url = $url_prefix + "almaws/v1/items?item_barcode=" + $barcode + $queryParams
+		
+		#Write-Host "Item URL " $item_by_barc_url
 			
 	try{		
 			#API call and assign result to xml variable
 			[xml]$xml = Invoke-RestMethod -Method 'GET' -Uri $item_by_barc_url	
-			Start-Sleep 5
+			Start-Sleep 3
 		}
 	
 	catch	
@@ -56,21 +60,51 @@ $rowbarc,$colbarc = 1,1
 		write-host "Fatal error: Get Item By Barcode" -ForegroundColor Red
 		write-host "Exception Type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
 		write-host "Exception Message: $($_.Exception.Message)" -ForegroundColor Red	
-		Add-Content "C:\Work\Alma\Scripts\Errors\get-item-errors.txt" $barcode
+		Add-Content "C:\Work\Bulk returns\get-item-errors.txt" $barcode
 		}
 				
 		#scan through returned xml and retrieve item link (redirected to from the barcode url)
 		#this is required to carry out the scan-in operation
 		$item_url = $xml.item.link
+			
+		Write-Host $item_url
 		
-	
+		#gather parameters for outstanding requests
+		$holding_id = $xml.item.holding_data.holding_id
+		$itemid = $xml.item.item_data.pid
+		$mmsid = $xml.item.bib_data.mms_id
+		
+		
+		#construct request check link here, return request data
+		$req_url = $item_url + "/requests?" + $queryParams
+		
+		[xml]$req_xml = Invoke-RestMethod -Method 'GET' -Uri $req_url 	
+		
+		Start-Sleep 3
+		
+		$req_count = $req_xml.user_requests.total_record_count	
+			
+		if ($req_count -ne '0'){
+		
+			Write-Host "Request Found"
+			Add-Content "C:\Work\Bulk returns\items-with-requests.txt" $barcode
+		
+		}
+		
+		Write-Host $req_url
+
 		#construct scan-in link
 		$scan_in_url = $item_url +  "?op=scan&library=" + $library + "&circ_desk=" + $circ_desk + $queryParams
 		
 	try{
-			#scan item in
-			Invoke-WebRequest -Method 'POST' -Uri $scan_in_url -ContentType application/xml 
-			Start-Sleep 5
+			#scan item in, but only if there isn't an active hold
+			
+			if ($req_count -ne '0'){
+				}else{
+					Write-Host "Returning Item"
+					Invoke-WebRequest -Method 'POST' -Uri $scan_in_url -ContentType application/xml 
+			    }
+			Start-Sleep 3
 		}
 	catch
 		{
@@ -85,6 +119,3 @@ $rowbarc,$colbarc = 1,1
 $objExcel.quit()
 
 Write-Host "Processing Complete"
-
-
-
