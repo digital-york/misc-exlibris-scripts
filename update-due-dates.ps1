@@ -1,13 +1,12 @@
-﻿# PS script to read through file of barcodes ...
-# ... retrieve item link for each and perform scan-in
-# uses BIBS API (Bulk Returns)
+﻿# PS script to read through file of user ids/loans
+# ... apply 14 day extension 
 
 #load the System Web Assembly - required for encoding action below
 [Reflection.Assembly]::LoadWithPartialName("System.Web") | Out-Null
 
 #define variables
 $url_prefix = "https://api-na.hosted.exlibrisgroup.com/"
-$queryParams = '?' +  [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('l8xx1f7d2163f0884b06b952e3f942e80b47');
+$queryParams = '?' +  [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('');
 
 #$api_key = [System.Web.HttpUtility]::UrlEncode($key) 
 $file = "C:\Work\overdue Lost Loans\test.xlsx"
