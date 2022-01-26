@@ -6,7 +6,7 @@
 
 #define variables
 $url_prefix = "https://api-eu.hosted.exlibrisgroup.com/"
-$queryParams = '?' + [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('l8xx96250cee59df42d49afdfb41035812a7');
+$queryParams = '?' + [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('**API KEY GOES HERE');
 $file = "C:\Work\overdue Lost Loans\overdue.xlsx"
 $sheetName = "overdue"
 
