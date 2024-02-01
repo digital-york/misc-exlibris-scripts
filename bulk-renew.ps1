@@ -55,8 +55,9 @@ $rowusr,$coluser,$colid = 1,1,2
 		{
 		write-host "Fatal error: Renew" -ForegroundColor Red
 		write-host "Exception Type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
-		write-host "Exception Message: $($_.Exception.Message)" -ForegroundColor Red	
-		Add-Content "C:\Work\renewals\renew-errors.txt" $loan_id
+		write-host "Exception Message: $($_.Exception.Message)" -ForegroundColor Red
+        $error_dets = $user + ',' + $loan_id
+		Add-Content "C:\Work\renewals\renew-errors.txt" $error_dets
 		}				
 	}
 #close excel file
