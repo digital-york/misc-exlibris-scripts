@@ -6,7 +6,7 @@
 
 #define variables
 $url_prefix = "https://api-eu.hosted.exlibrisgroup.com/"
-$queryParams = '?' + 'op=renew' + '&' + [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('**enter API key here**');
+$queryParams = '?' + 'op=renew' + '&' + [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('API KEY VALUE');
 $file = "C:\Work\renewals\renew.xlsx"
 $sheetName = "renew"
 
