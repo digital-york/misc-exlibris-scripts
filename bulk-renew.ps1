@@ -1,12 +1,14 @@
 # PS script to read through file of user ids/loans
-# ... apply 14 day extension 
+# and renew
+#**REMOVE API VALUE BEFORE SUBMITTING**
 
 #load the System Web Assembly - required for encoding action below
 [Reflection.Assembly]::LoadWithPartialName("System.Web") | Out-Null
 
 #define variables
 $url_prefix = "https://api-eu.hosted.exlibrisgroup.com/"
-$queryParams = '?' + 'op=renew' + '&' + [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('API KEY VALUE');
+$queryParams = '?' + 'op=renew' + '&' + [System.Web.HttpUtility]::UrlEncode('apikey') + '=' + [System.Web.HttpUtility]::UrlEncode('API KEY GOES HERE');
+
 $file = "C:\Work\renewals\renew.xlsx"
 $sheetName = "renew"
 
@@ -26,10 +28,12 @@ $rowusr,$coluser,$colid = 1,1,2
 
 
 #loop through sheet and act on each row
-	for ($i=1; $i -le $rowMax-1; $i++)
+	for ($i=0; $i -le $rowMax-1; $i++)
 	{
 
-		$user = $sheet.Cells.Item($rowusr+$i,$coluser).text
+	   $user = $sheet.Cells.Item($rowusr+$i,$coluser).text
+
+       # $user = $sheet.Cells.Item(1,1).text
 
         $loan_id = $sheet.Cells.Item($rowusr+$i,$colid).text
 		
@@ -43,8 +47,9 @@ $rowusr,$coluser,$colid = 1,1,2
 			
         #renew loan
         $renew_url = $url_prefix + "almaws/v1/users/" + $user + "/loans/" + $loan_id +  $queryParams
+
+        Write-Host ($renew_url)
 		
-		Write-Host $renew_url
 
         #renew loan	
 	try{		
