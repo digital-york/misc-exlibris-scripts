@@ -20,7 +20,6 @@
     This command will delete the file 'old_report.docx' from 'C:\data\reports\' if it exists,
     and then create a zip file named 'reports.zip' in 'C:\archives\' containing everything
     that was in the 'C:\data\reports\' folder.
-#>
 param (
     [Parameter(Mandatory=$true, HelpMessage="Enter the full path to the file you want to delete.")]
     [string]$TargetFile,
@@ -28,6 +27,11 @@ param (
     [Parameter(Mandatory=$true, HelpMessage="Enter the full path for the output zip file (e.g., C:\archives\backup.zip).")]
     [string]$ZipDestinationPath
 )
+#>
+
+$TargetFile = "C:\Users\pol_m\Desktop\44YORK_INST-NUI\custom1.bak"
+$ZipDestinationPath = "C:\Users\pol_m\Desktop\44YORK-NUI.zip"
+
 
 # --- Main Script ---
 
