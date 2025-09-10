@@ -1,86 +1,132 @@
 <#
-.SYNOPSIS
-    (Module-Free Version) Reads a CSV file to find duplicate reading lists for courses,
-    identifies the OLDEST record in each duplicate group, and constructs an API URL.
-    This script uses built-in PowerShell commands and requires no external modules.
+This script scans through a list of courses for duplicate reading lists.
+If a duplicate exists, it identifies the version with the oldest modification date
+and removes this via the Alma api
 
-.DESCRIPTION
-    1.  Sets the path to the source CSV file.
-    2.  Imports the data using the built-in 'Import-Csv'. This correctly handles long IDs as text.
-    3.  Groups the data by 'Course Code' and 'Reading List Name'.
-    4.  Filters to find only the groups with more than one item (the duplicates).
-    5.  For each group, it explicitly converts the modification date string into a proper DateTime object
-        to ensure accurate, chronological sorting.
-    6.  It sorts the group by this date and selects the oldest record.
-    7.  It then constructs the final API URL from the 'Course ID' and 'Reading List Id' of that oldest record.
-    8.  All generated URLs are printed to the console.
 #>
 
 # --- CONFIGURATION ---
-# !!! IMPORTANT: Update this to the full path or just the filename if it's in the same folder as the script.
-$csvFilePath = "C:\Work\dupes.csv"
-
+# source file
+$filePath = "C:\Work\dupes.csv"
+$apiKey = "***INSERT API KEY VALUE***"
+$outputLogFile = "C:\Work\log.txt"
 # --- SCRIPT ---
 
 # 1. Check if the source file exists
-if (-not (Test-Path $csvFilePath)) {
-    Write-Host "Error: The source CSV file was not found at '$csvFilePath'." -ForegroundColor Red
-    Write-Host "Please update the '`$csvFilePath' variable in the script." -ForegroundColor Red
-    return # Stop the script
+if (-not (Test-Path $filePath)) {
+    Write-Host "Error: The source file was not found at '$filePath'." -ForegroundColor Red
+    return
 }
 
-Write-Host "Processing file: $csvFilePath" -ForegroundColor Green
+Write-Host "Processing file: $filePath (as a Tab-Separated file)..." -ForegroundColor Green
 
 try {
-    # 2. Import data using the built-in Import-Csv command. No extra modules needed.
-    $data = Import-Csv -Path $csvFilePath
+    # 2. Import the data
+    $allData = Import-Csv -Path $filePath -Delimiter "`t"
 
-    # 3. Group by Course Code and Reading List Name to find duplicates
-    # The '.GetEnumerator()' is used to handle potential single-item groups gracefully.
-    $duplicateGroups = $data | Group-Object -Property 'Course Code', 'Reading List Name' | Where-Object { $_.Count -gt 1 }
+    # 3. Filter for valid records.
+    $validData = $allData | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_.'Course Code') -and
+        -not [string]::IsNullOrWhiteSpace($_.'Reading List Name')
+    }
 
-    if ($null -eq $duplicateGroups) {
-        Write-Host "No duplicate records found matching the criteria." -ForegroundColor Yellow
+    if ($validData.Count -eq 0) {
+        Write-Host "No valid data rows found after filtering." -ForegroundColor Yellow
         return
     }
 
-    Write-Host "Found $($duplicateGroups.Count) groups of duplicates. Identifying the oldest record in each..." -ForegroundColor Cyan
+    Write-Host "Found $($validData.Count) valid data rows to process..."
+
+    # 4. Group the clean data to find duplicates
+    $duplicateGroups = $validData | Group-Object -Property 'Course Code', 'Reading List Name' | Where-Object { $_.Count -gt 1 }
+
+    if ($duplicateGroups.Count -eq 0) {
+        Write-Host "No duplicate records were found in the valid data." -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "Found $($duplicateGroups.Count) groups of duplicates. Generating URLs..."
     Write-Host "--- Generating URLs ---"
 
-    # 4. Iterate through each group of duplicates
-foreach ($group in $duplicateGroups) {
-        # 5. Find the oldest record in the group
-        $oldestRecord = $group.Group |
-            # --- FIX APPLIED HERE ---
-            # First, filter out any rows where the modification date is null or just whitespace.
+    # 5. Iterate through each group and find the oldest record
+    foreach ($group in $duplicateGroups) {
+        $sortedRecords = $group.Group |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_.'Reading List Modification Date') } |
-            # Now, it is safe to sort the remaining (valid) rows.
-            Sort-Object -Property @{Expression={ [datetime]$_.'Reading List Modification Date' }} |
-            Select-Object -First 1
+            Select-Object *, @{Name="ParsedDate"; Expression={
+                $dateString = $_.'Reading List Modification Date'.Trim()
+                # Match different date patterns and construct the datetime object manually.
+                if ($dateString -match '(\d{2})/(\d{2})/(\d{4}) (\d{2}):(\d{2})') { # dd/MM/yyyy HH:mm
+                    # $matches[3] = Year, $matches[2] = Month, $matches[1] = Day, etc.
+                    return New-Object datetime($matches[3], $matches[2], $matches[1], $matches[4], $matches[5], 0)
+                } elseif ($dateString -match '(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})') { # yyyy-MM-dd HH:mm:ss
+                    return New-Object datetime($matches[1], $matches[2], $matches[3], $matches[4], $matches[5], $matches[6])
+                } else {
+                    Write-Host "Warning: Could not recognize the date format for '$dateString'. Skipping." -ForegroundColor Yellow
+                    return $null
+                }
+            }} |
+            Where-Object { $_.ParsedDate -ne $null } |
+            Sort-Object -Property ParsedDate
 
-        # Check if we found a valid oldest record (it could be null if all dates in the group were blank)
-        if ($null -ne $oldestRecord) {
-            # 6. Construct the URL from the oldest record's data
+        if ($sortedRecords) {
+            $oldestRecord = $sortedRecords | Select-Object -Last 1
+
+            # 6. Construct the URL
             $courseId = $oldestRecord.'Course ID'
             $readingListId = $oldestRecord.'Reading List Id'
 
             if (-not [string]::IsNullOrWhiteSpace($courseId) -and -not [string]::IsNullOrWhiteSpace($readingListId)) {
-                $url = "https://api-eu.hosted.exlibrisgroup.com/almaws/v1/courses/$courseId/reading-lists/$readingListId"
+                $url = "https://api-eu.hosted.exlibrisgroup.com/almaws/v1/courses/$($courseId.Trim())/lists/$($readingListId.Trim())?apikey=$($apiKey)"
                 Write-Host $url
-            }
-            else {
-                Write-Host "Warning: Skipping a record in group '$($group.Name)' due to a missing ID." -ForegroundColor Yellow
-            }
-        }
-        else {
-             Write-Host "Warning: Skipping group '$($group.Name)' because no valid modification dates were found." -ForegroundColor Yellow
-        }
-    }
+                $courseCode = $oldestRecord.'Course Code'
+                $listName = $oldestRecord.'Reading List Name'
+                $modDate = $oldestRecord.'Reading List Modification Date'
 
-    Write-Host "--- Script finished ---" -ForegroundColor Green
+# log results
+$courseCode = $oldestRecord.'Course Code'
+$listName = $oldestRecord.'Reading List Name'
+$modDate = $oldestRecord.'Reading List Modification Date'
+
+# Create a formatted string for the log file
+$logOutput = @"
+URL: $url
+Course Code: $courseCode
+Reading List Name: $listName
+Modification Date: $modDate
+----------------------------------
+$logOutput = @"
+URL: {0}
+Course Code: {1}
+Reading List Name: {2}
+Modification Date: {3}
+----------------------------------
+"@ -f $url, $courseCode, $listName, $modDate
+
+# Append the string to the log file
+Add-Content -Path $outputLogFile -Value $logOutput
+Write-Host "--> Wrote URL for list '$listName' to $outputLogFile" -ForegroundColor Cyan
+Write-Host "---"
+                
+# --- API ACTION ---
+        Write-Host "Attempting to DELETE Reading List ID $($readingListId.Trim())..." -ForegroundColor Yellow
+        try {
+            # To run for real, remove the '#' from the beginning of the next line.
+            #Invoke-RestMethod -Uri $url -Method Delete
+
+            Write-Host "SUCCESS: The DELETE request was sent." -ForegroundColor Green
+        }
+        catch {
+            $errorMessage = $_.Exception.Response.StatusCode
+            Write-Host "FAILED: The API returned an error: $errorMessage" -ForegroundColor Red
+        }
+        Write-Host "---"
+    }
+ }
+}
+
+    Write-Host "Script finished. Log file created at: $outputLogFile" -ForegroundColor Green
 }
 catch {
     Write-Host "An unexpected error occurred during script execution:" -ForegroundColor Red
-    # This will print the specific error message, e.g., about date formatting
     Write-Host $_.Exception.Message -ForegroundColor Red
 }
