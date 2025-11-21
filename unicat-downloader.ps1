@@ -18,7 +18,7 @@ $sourceUrl = "https://api.library.hull.ac.uk/marc_records/"
 
 # 1. Get the destination folder from the user
 try {
-    $destinationFolder = Read-Host -Prompt "Please enter the full path for the destination folder (e.g., C:\MARC_Downloads)"
+    $destinationFolder = "C:\Work\Unicat"
     
     if ([string]::IsNullOrWhiteSpace($destinationFolder)) {
         Write-Warning "No destination folder provided. Exiting script."
